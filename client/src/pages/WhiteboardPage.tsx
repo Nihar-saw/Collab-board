@@ -195,11 +195,9 @@ function WhiteboardPage() {
     }
 
     if (activeTool === 'hand') {
-      const clickedAction = [...actions].reverse().find(action => isPointInAction(pos, action));
-      if (clickedAction) {
-        setSelectedActionId(clickedAction.actionId || null);
-        setIsDrawing(true);
-        return;
+      setIsDrawing(true);
+      if ('touches' in e) {
+        (e as any).lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
       return;
     }
@@ -244,6 +242,27 @@ function WhiteboardPage() {
         return;
       }
       
+      if (selectedActionId) {
+        const dx = pos.x - startPos.current.x;
+        const dy = pos.y - startPos.current.y;
+        setActions(prev => prev.map(a => {
+          if (a.actionId === selectedActionId) {
+            const updated = { ...a };
+            if (updated.startX !== undefined) updated.startX += dx;
+            if (updated.startY !== undefined) updated.startY += dy;
+            if (updated.endX !== undefined) updated.endX += dx;
+            if (updated.endY !== undefined) updated.endY += dy;
+            if (updated.points) updated.points = updated.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+            return updated;
+          }
+          return a;
+        }));
+        startPos.current = pos;
+      }
+      return;
+    }
+
+    if (activeTool === 'hand') {
       let moveX = 0; let moveY = 0;
       if ('movementX' in e) { moveX = (e as any).movementX; moveY = (e as any).movementY; }
       else if ('touches' in e && (e as any).lastTouch) {
@@ -253,25 +272,6 @@ function WhiteboardPage() {
         (e as any).lastTouch = { x: touch.clientX, y: touch.clientY };
       }
       if (moveX !== 0 || moveY !== 0) setPanOffset(prev => ({ x: prev.x + moveX, y: prev.y + moveY }));
-      return;
-    }
-
-    if (activeTool === 'hand' && selectedActionId) {
-      const dx = pos.x - startPos.current.x;
-      const dy = pos.y - startPos.current.y;
-      setActions(prev => prev.map(a => {
-        if (a.actionId === selectedActionId) {
-          const updated = { ...a };
-          if (updated.startX !== undefined) updated.startX += dx;
-          if (updated.startY !== undefined) updated.startY += dy;
-          if (updated.endX !== undefined) updated.endX += dx;
-          if (updated.endY !== undefined) updated.endY += dy;
-          if (updated.points) updated.points = updated.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
-          return updated;
-        }
-        return a;
-      }));
-      startPos.current = pos;
       return;
     }
 
@@ -312,11 +312,15 @@ function WhiteboardPage() {
     setIsResizing(false);
     setResizeHandle(null);
 
-    if (activeTool === 'select' || activeTool === 'hand') {
+    if (activeTool === 'select') {
       if (selectedActionId) {
         const action = actions.find(a => a.actionId === selectedActionId);
         if (action) sendMove(action);
       }
+      return;
+    }
+
+    if (activeTool === 'hand') {
       return;
     }
 
